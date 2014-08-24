@@ -104,11 +104,9 @@
 (def first-time (atom true))
 
 (defn should-show-namespace? [ns-sym show-opts]
-  (when @first-time
-    (println (format "jafinger-dbg: show-opts='%s'" show-opts))
-    (reset! first-time false))
-  ;; TBD
-  true
+;;  (when @first-time
+;;    (println (format "jafinger-dbg: show-opts='%s'" show-opts))
+;;    (reset! first-time false))
   (loop [opts show-opts]
     (when-first [opt opts]
       (cond
@@ -202,6 +200,8 @@ file and namespace to avoid name collisions."))})
                     (println "\nFiles in /filemap but not in /files:")
                     (pp/pprint only-in-filemap))
                   (when-not (empty? only-in-files)
-                    (println "\nFiles in /files but not in /filemap, probably because they have no top-level ns form that tools.namespace can find:")
-                    (pp/pprint only-in-files)))}))
+                    (println
+"\nFiles in /files but not in /filemap, probably because they have
+no top-level ns form that tools.namespace can find:")
+                    (pp/pprint (map str only-in-files))))}))
            tracker))))))
