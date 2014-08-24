@@ -3,6 +3,8 @@
             [clojure.edn :as edn]
             [clojure.set :as set]
             [clojure.java.io :as io]
+            [rhizome.dot :as dot]
+            [rhizome.viz :as viz]
             [dolly.namespace :as ns]))
 
 
@@ -125,10 +127,10 @@ Found these non-strings:")
        (or
         (non-string-paths paths)
         (nonexistent-paths paths)
-        (assoc cmd-opts
-          :err nil
-          :paths paths
-          :namespace-show-opts [{:exclude ns/clojure-core-namespaces}]))))))
+        (merge
+         {:namespace-show-opts [{:exclude ns/clojure-core-namespaces}]}
+         cmd-opts
+         {:err nil, :paths paths}))))))
 
 
 (defn handle-errwarn [info]
@@ -159,10 +161,20 @@ Found these non-strings:")
                        {})
             ns-opts (calc-ns-opts project cmd-opts)
             _ (handle-errwarn ns-opts)
-            ns-info (ns/namespaces-in-dirs ns-opts)]
-        (handle-errwarn ns-info)
-        (println "Dependencies:")
-        (ns/print-ns-deps-text ns-info))
+            ns-info (ns/namespaces-in-dirs ns-opts)
+            _ (handle-errwarn ns-info)
+            graph-args (ns/ns-info->graph-args ns-info)]
+        (case (:format ns-info)
+          (nil :text) (do
+                        (println "Dependencies:")
+                        (ns/print-ns-deps-text ns-info))
+          :dot (spit "nsdeps.dot" (apply dot/graph->dot graph-args))
+          :svg (spit "nsdeps.svg" (apply viz/graph->svg graph-args))
+          :png (viz/save-image (apply viz/graph->image graph-args)
+                                "nsdeps.png")
+          :window (do
+                    (apply viz/view-graph graph-args)
+                    (read-line))))
       
       ("ls" "list-clones")
       (println "list-clones not implemented yet")

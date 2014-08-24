@@ -3,5 +3,6 @@
   :url "http://github.com/jafingerhut/dolly"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/tools.namespace "0.2.6-SNAPSHOT"]]
+  :dependencies [[org.clojure/tools.namespace "0.2.6-SNAPSHOT"]
+                 [rhizome "0.2.1"]]
   :eval-in-leiningen true)

@@ -2,9 +2,11 @@
   (:require [clojure.data :as data]
             [clojure.string :as str]
             [clojure.pprint :as pp]
+            [clojure.set :as set]
             [clojure.tools.namespace.file :as file]
             [clojure.tools.namespace.track :as track]
             [clojure.tools.namespace.dir :as dir]
+            [clojure.tools.namespace.dependency :as dep]
             [dolly.util :as util])
   (:import [java.io File]))
 
@@ -120,7 +122,6 @@
   [ns-info]
   (let [show-opts (:namespace-show-opts ns-info)
         nss-unload-order (:clojure.tools.namespace.track/unload ns-info)
-        nss-load-order (:clojure.tools.namespace.track/load ns-info)
         dependencies (:dependencies (:clojure.tools.namespace.track/deps
                                      ns-info))
         ns-number (atom 1)
@@ -150,6 +151,22 @@
         (show ns 0)))))
 
 
+(defn ns-info->graph-args [ns-info]
+  (let [show-opts (:namespace-show-opts ns-info)
+        nss-unload-order (:clojure.tools.namespace.track/unload ns-info)
+;;        _ (println "jafinger-dbg: ns-info->graph-args nss-unload-order=" (seq nss-unload-order))
+        nss-set (set nss-unload-order)
+        deps (:clojure.tools.namespace.track/deps ns-info)
+        dependencies (:dependencies deps)
+        nodes (set/union
+               nss-set
+               (set (filter #(should-show-namespace? % show-opts)
+                            (dep/transitive-dependencies-set deps nss-set))))
+;;        _ (println "jafinger-dbg: ns-info->graph-args nodes=" (seq nodes))
+        ]
+    [nodes dependencies :node->descriptor (fn [n] {:label n})]))
+
+
 (defn filename-namespace-mismatch-map [mismatches]
   {:err :filename-namespace-mismatch
    :err-data mismatches
@@ -173,6 +190,94 @@ merely suggestions.  It may be better in your case to rename both the
 file and namespace to avoid name collisions."))})
 
 
+(defn before?
+  "True if x comes before y in an ordered collection.  Also returns
+true if only x is in the collection, or neither x nor y is in the
+collection.  Returns false only if y is found before an occurrence of
+x is found."
+  [coll x y]
+  (loop [[item & more] (seq coll)]
+    (cond (nil? item) true  ; end of the seq
+          (= x item) true  ; x comes first
+          (= y item) false
+          :else (recur more))))
+
+
+(defn tracker-dependency-pairs
+  "From :dependencies in the tracker, return a list of 2-element
+vectors [a b], where a and b are symbols representing namespaces, and
+a requires or uses b."
+  [tracker]
+  (let [dependencies (:dependencies (:clojure.tools.namespace.track/deps
+                                     tracker))]
+    (for [a (keys dependencies)
+          b (dependencies a)]
+      [a b])))
+
+
+(defn tracker-dependent-pairs
+  "From :dependencies in the tracker, return a list of 2-element
+vectors [a b], where a and b are symbols representing namespaces, and
+a requires or uses b."
+  [tracker]
+  (let [dependents (:dependents (:clojure.tools.namespace.track/deps
+                                 tracker))]
+    (for [b (keys dependents)
+          a (dependents b)]
+      [a b])))
+
+
+(defn wrong-tracker-load-unload-order
+  "Returns nil if the tracker has load and unload orders that are
+consistent with its :dependencies and :dependents graphs.  If there
+are inconsistencies, returns a map containing either or both of the
+keys :load or :unload, where the values are a sequence of 2-element
+vectors [a b] where a and b are symbols representing namespace names,
+and a requires or uses b, and that dependency order is violated by the
+load or unload order in the tracker."
+  [tracker]
+  (let [load-order (:clojure.tools.namespace.track/load tracker)
+        load-set (set load-order)
+        unload-order (:clojure.tools.namespace.track/unload tracker)
+        unload-set (set unload-order)
+        dependency-pairs (tracker-dependency-pairs tracker)
+        dependent-pairs (tracker-dependent-pairs tracker)
+        load-order-violations (filter (fn [[a b]]
+                                        (and (load-set a)
+                                             (load-set b)
+                                             (before? load-order a b)))
+                                      (concat dependency-pairs
+                                              dependent-pairs))
+        unload-order-violations (filter (fn [[a b]]
+                                          (and (unload-set a)
+                                               (unload-set b)
+                                               (before? unload-order b a)))
+                                        (concat dependency-pairs
+                                                dependent-pairs))]
+    (if (or (seq load-order-violations)
+            (seq unload-order-violations))
+      {:load (seq load-order-violations)
+       :unload (seq unload-order-violations)}
+      nil)))
+
+
+(defn bad-load-unload-order-map [bad-order tracker]
+  {:err :bad-load-unload-order
+   :err-data bad-order
+   :err-msg
+   (with-out-str
+     (when (:load bad-order)
+       (println "Namespace tracker load order is:")
+       (println (:clojure.tools.namespace.track/load tracker))
+       (println "It violates the following [a b] dependencies, where a requires or uses b:")
+       (println (:load bad-order)))
+     (when (:unload bad-order)
+       (println "Namespace tracker unload order is:")
+       (println (:clojure.tools.namespace.track/unload tracker))
+       (println "It violates the following [a b] dependencies, where a requires or uses b:")
+       (println (:unload bad-order))))})
+
+
 (defn namespaces-in-dirs [opts]
   (let [paths (map canonical-filename (:paths opts))
         mismatches (filename-namespace-mismatches paths)]
@@ -187,7 +292,9 @@ file and namespace to avoid name collisions."))})
               f2 (:clojure.tools.namespace.dir/files tracker)]
           (merge
            opts
-           {:err nil}
+           (if-let [bad-order (wrong-tracker-load-unload-order tracker)]
+             (bad-load-unload-order-map bad-order tracker)
+             {:err nil})
            (if (= f1 f2)
              {:warn nil}
              (let [[only-in-filemap only-in-files] (data/diff f1 f2)]
