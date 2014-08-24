@@ -163,7 +163,7 @@ Found these non-strings:")
             ns-info (ns/namespaces-in-dirs ns-opts)
             _ (handle-errwarn ns-info)
             graph-args (ns/ns-info->graph-args ns-info)]
-        (if (contains? #{:nil :text :dot} (:format ns-info))
+        (if (contains? #{nil :text :dot} (:format ns-info))
           ;; Then don't require rhizome.viz, since by default it pops
           ;; up another JVM GUI-related icon in the doc on Mac OS X.
           (case (:format ns-info)
