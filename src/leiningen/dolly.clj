@@ -2,15 +2,32 @@
   (:require [clojure.pprint :as pp]
             [clojure.edn :as edn]
             [clojure.set :as set]
+            [clojure.java.io :as io]
             [dolly.namespace :as ns]))
 
 
 (def dolly-version-string "0.1.0-SNAPSHOT")
+(def dolly-url "https://github.com/jafingerhut/dolly")
 
 
-(defn dolly-help []
-  (println "lein dolly: Clone Clojure library source code into your project.")
-  (println (format "Version %s" dolly-version-string))
+(defn dolly-help [args]
+  (println
+"lein dolly: Clone Clojure library source code into your project.
+Version" dolly-version-string "
+
+    $ lein dolly <cmd>
+
+where <cmd> is one of:
+
+    help
+    ns namespaces
+    ls list-clones add add-clone remove remove-clone
+
+See" dolly-url "for full documentation.")
+
+  (when (not= args :short)
+    ;; tbd: more help here, perhaps depending upon args
+    )
   (flush))
 
 
@@ -33,94 +50,127 @@
   (flush))
 
 
-(defn replace-ns-keywords
-  [namespaces source-paths test-paths]
+(defn replace-paths-keywords
+  [paths source-paths test-paths]
   (mapcat (fn [x]
             (if (keyword? x)
               (case x
                 :source-paths source-paths
-                :test-paths test-paths
-                ;;:force-order []
-                )
+                :test-paths test-paths)
               [x]))
-          namespaces))
+          paths))
 
 
-(defn unknown-ns-keywords
-  [namespaces known-ns-keywords desc]
-  (let [keyword-set (set (filter keyword? namespaces))
-        unkn-ns-keywords (set/difference keyword-set known-ns-keywords)]
-    (if (empty? unkn-ns-keywords)
+(defn not-sequence [paths]
+  (if (sequential? paths)
+    nil
+    {:err :paths-not-a-sequence
+     :err-msg
+     (with-out-str
+       (println ":paths option value must be a sequence.  Found:" paths))}))
+
+
+(defn unknown-paths-keywords
+  [paths known-kws desc]
+  (let [kw-set (set (filter keyword? paths))
+        unknown-kws (set/difference kw-set known-kws)]
+    (if (empty? unknown-kws)
       nil
-      {:err :unknown-ns-keywords,
-       :msg
+      {:err :unknown-paths-keywords,
+       :err-msg
        (with-out-str
-         (println (format "The following keywords appeared in the namespaces specified after %s :"
+         (println (format "The following keywords appeared in the paths specified after %s :"
                           desc))
-         (println (format "    %s" (seq unkn-ns-keywords)))
-         (println (format "The only keywords allowed in this list of namespaces are: %s"
-                          (seq known-ns-keywords))))})))
+         (println (format "    %s" (seq unknown-kws)))
+         (println (format "The only keywords allowed in this list of paths are: %s"
+                          (seq known-kws))))})))
+
+(defn non-string-paths [paths]
+  (let [non-strings (remove string? paths)]
+    (if (empty? non-strings)
+      nil
+      {:err :non-string-paths
+       :err-msg
+       (with-out-str
+         (println
+"All :paths must be strings or keywords :source-paths or :test-paths
+Found these non-strings:")
+         (println (str (seq non-strings))))})))
 
 
-(defn opts->namespaces
-  [opts]
-  (let [namespaces (distinct (or (:namespaces opts)
-                                 [:source-paths :test-paths]))
-        excluded-namespaces (set (:exclude-namespaces opts))]
-    ;; Return an error if any keywords appear in the namespace lists
-    ;; that are not recognized.
+(defn filename-exists? [filename]
+  (.exists (io/file filename)))
+
+
+(defn nonexistent-paths [paths]
+  (let [nonexistent-paths (remove filename-exists? paths)]
+    (if (empty? nonexistent-paths)
+      nil
+      {:err :nonexistent-paths
+       :err-msg
+       (with-out-str
+         (println "All :paths must be files that exist.  Found these exceptions:")
+         (println (str (seq nonexistent-paths))))})))
+
+
+(defn calc-ns-opts
+  [project cmd-opts]
+  (let [paths (or (:paths cmd-opts) [:source-paths])]
     (or
-     (unknown-ns-keywords namespaces #{:source-paths :test-paths}
-                          ":namespaces")
-     (unknown-ns-keywords excluded-namespaces #{:source-paths :test-paths}
-                          ":exclude-namespaces")
-     ;; If keyword :source-paths occurs in namespaces or
-     ;; excluded-namespaces, replace it with all namespaces found in
-     ;; the directories in (:source-paths opts), in an order that
-     ;; honors dependencies, and similarly for :test-paths.
-     ;; namespaces-in-dirs traverses part of the file system, so only call it
-     ;; once for each of :source-paths and :test-paths, and only if
-     ;; needed.
-     (let [source-paths (if (some #(= % :source-paths)
-                                  (concat namespaces excluded-namespaces))
-                          (ns/namespaces-in-dirs
-                           (:source-paths opts)
-                           {:debug-desc (str ":source-paths "
-                                             (seq (:source-paths opts)))}))
-           test-paths (if (some #(= % :test-paths)
-                                (concat namespaces excluded-namespaces))
-                        (ns/namespaces-in-dirs
-                         (:test-paths opts)
-                         {:debug-desc (str ":test-paths "
-                                           (seq (:test-paths opts)))}))
-           namespaces (replace-ns-keywords namespaces source-paths test-paths)
-           namespaces (distinct namespaces)
-           excluded-namespaces (set (replace-ns-keywords excluded-namespaces
-                                                         source-paths
-                                                         test-paths))
-           namespaces (remove excluded-namespaces namespaces)]
-       {:err nil, :namespaces namespaces}))))
+     (not-sequence paths)
+     (unknown-paths-keywords paths #{:source-paths :test-paths}
+                             ":paths")
+     (let [paths (replace-paths-keywords paths (:source-paths project)
+                                         (:test-paths project))]
+       (or
+        (non-string-paths paths)
+        (nonexistent-paths paths)
+        (assoc cmd-opts
+          :err nil
+          :paths paths
+          :namespace-show-opts [{:exclude ns/clojure-core-namespaces}]))))))
+
+
+(defn handle-errwarn [info]
+  (when (:err info)
+    (print (:err-msg info))
+    (flush)
+    (System/exit 1))
+  (when (:warn info)
+    (print (:warn-msg info))
+    (flush)))
 
 
 (defn dolly
   "Clone Clojure lib source into your project."
-  [project & args]
-  ;;(debug-dolly-args project args)
-  (if (= (first args) "help")
-    (dolly-help)
-    (let [opts (merge (select-keys project [:source-paths :test-paths])
-                      (if (>= (count args) 1)
-                        (edn/read-string (first args))
-                        {}))
-          ret (opts->namespaces opts)
-          _ (do
-              (println "jafinger-dbg: opts->namespaces ret=")
-              (pp/pprint ret)
-              (println "----------------------------------------")
-              )
-          {:keys [err msg namespaces]} ret]
-      ;;(debug-dolly-args project args opts namespaces)
-      (when err
-        (print msg)
-        (flush)
-        (System/exit 1)))))
+  [project & all-dolly-args]
+  (let [[dolly-cmd & args] all-dolly-args]
+    ;;(debug-dolly-args project all-dolly-args)
+    (case dolly-cmd
+      nil
+      (dolly-help :short)
+      
+      ("help")
+      (dolly-help args)
+      
+      ("ns" "namespaces")
+      (let [cmd-opts (if-let [s (first args)]
+                       (edn/read-string s)
+                       {})
+            ns-opts (calc-ns-opts project cmd-opts)
+            _ (handle-errwarn ns-opts)
+            ns-info (ns/namespaces-in-dirs ns-opts)]
+        (handle-errwarn ns-info)
+        (println "Dependencies:")
+        (ns/print-ns-deps-text ns-info))
+      
+      ("ls" "list-clones")
+      (println "list-clones not implemented yet")
+      
+      ("add" "add-clone")
+      (println "add-clone not implemented yet")
+              
+      ("remove" "remove-clone")
+      (println "remove-clone not implemented yet")
+      
+      (println (format "Unknown dolly command '%s'" dolly-cmd)))))

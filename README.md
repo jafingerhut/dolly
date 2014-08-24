@@ -56,6 +56,7 @@ the rest of the files in your project.
 List info about any namespaces that dolly has previously been used to
 clone into your project:
 
+    $ lein dolly list-clones
     $ lein dolly ls
 
 Add a new clone of a namespace hierarchy to your project:
@@ -125,8 +126,10 @@ TBD: Give example of this to make it clearer.
 ### Show all namespaces with their dependencies
 
     $ lein dolly ns
+    $ lein dolly ns '{ <option key/value pairs> }'
 
-The default behavior is:
+You may also use the long form 'namespaces' instead of 'ns'.  The
+default behavior is:
 
 * Show all namespaces defined in some file in your Leiningen project
   `:source-paths` and their subdirectories.
@@ -135,12 +138,12 @@ The default behavior is:
    e.g. `clojure.core`, `clojure.set`, `clojure.string`, etc. since
    these are so common.
 
-`:source-paths` is the directory `src` if you do not override it in
-your `project.clj` file.
+`:source-paths` is the vector of one directory `[ "src" ]` if you do
+not override it in your `project.clj` file.
 
 Options controlling the form of output:
 
-* Show them in text on the standard output
+* Show them in text on the standard output (default)
 * Create a Graphviz dot file
 * Create a PNG file
 * Create a window showing the dependency graph
@@ -155,11 +158,16 @@ afraid to create more options for controlling the output.
 
 Options controlling the namespaces to show:
 
-* TBD: Make it easy to explicitly specify a list of directories,
-  optionally including the keywords `:source-paths` and/or
-  `:test-paths`, which are replaced with their values from the
-  Leiningen project.
-* Specify a set of namespaces to include or exclude
+* By default the directories to search for Clojure source files is
+  given by the value of the `:source-paths` key in your Leiningen
+  project.  You can specify your own vector of directories to search
+  after the `:paths` key in the options map.  Give directory names in
+  double-quoted strings.  If the keywords `:source-paths` or
+  `:test-paths` appear in the vector, they will be expanded to the
+  values of those keys in your Leiningen project, but flattened so the
+  result is a vector of strings.
+
+* TBD: Specify a set of namespaces to include or exclude
   * Default is to exclude showing namespaces that are part of Clojure,
     e.g. `clojure.core`, `clojure.set`, `clojure.string`, etc. since
     these are so common.
