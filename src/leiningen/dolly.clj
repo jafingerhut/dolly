@@ -4,7 +4,6 @@
             [clojure.set :as set]
             [clojure.java.io :as io]
             [rhizome.dot :as dot]
-            [rhizome.viz :as viz]
             [dolly.namespace :as ns]))
 
 
@@ -164,17 +163,33 @@ Found these non-strings:")
             ns-info (ns/namespaces-in-dirs ns-opts)
             _ (handle-errwarn ns-info)
             graph-args (ns/ns-info->graph-args ns-info)]
-        (case (:format ns-info)
-          (nil :text) (do
-                        (println "Dependencies:")
-                        (ns/print-ns-deps-text ns-info))
-          :dot (spit "nsdeps.dot" (apply dot/graph->dot graph-args))
-          :svg (spit "nsdeps.svg" (apply viz/graph->svg graph-args))
-          :png (viz/save-image (apply viz/graph->image graph-args)
-                                "nsdeps.png")
-          :window (do
-                    (apply viz/view-graph graph-args)
-                    (read-line))))
+        (if (contains? #{:nil :text :dot} (:format ns-info))
+          ;; Then don't require rhizome.viz, since by default it pops
+          ;; up another JVM GUI-related icon in the doc on Mac OS X.
+          (case (:format ns-info)
+            (nil :text) (do
+                          (println "Dependencies:")
+                          (ns/print-ns-deps-text ns-info))
+            :dot (spit "nsdeps.dot" (apply dot/graph->dot graph-args)))
+          (do
+            (require 'rhizome.viz)
+            (let [graph->svg (ns-resolve 'rhizome.viz 'graph->svg)
+                  graph->image (ns-resolve 'rhizome.viz 'graph->image)
+                  save-image (ns-resolve 'rhizome.viz 'save-image)
+                  view-graph (ns-resolve 'rhizome.viz 'view-graph)]
+              (case (:format ns-info)
+                :svg (spit "nsdeps.svg" (apply graph->svg graph-args))
+                :png (save-image (apply graph->image graph-args)
+                                 "nsdeps.png")
+                :window (do
+                          (apply view-graph graph-args)
+                          ;; TBD: If I don't do something to delay the
+                          ;; program exiting here, the window is shown
+                          ;; but then is closed immediately.  Is there a
+                          ;; way to make this program end only when
+                          ;; someone closes the new window?
+                          (println "Delaying quitting until you press return, otherwise the new window will close:")
+                          (read-line)))))))
       
       ("ls" "list-clones")
       (println "list-clones not implemented yet")
