@@ -32,8 +32,8 @@ FIXME: and add an example usage that actually makes sense:
 Things you can do with dolly:
 
 * TBD: List, add, upgrade, and remove namespaces cloned from other projects
-# Show all namespaces with their dependencies
-# TBD: Show Java classes and interfaces with their extends/implements relationships
+* Show all namespaces with their dependencies
+* TBD: Show Java classes and interfaces with their extends/implements relationships
 
 
 ### List, add, upgrade, remove namespaces cloned from other projects
@@ -160,11 +160,11 @@ Options controlling the namespaces to show:
   `:test-paths`, which are replaced with their values from the
   Leiningen project.
 * Specify a set of namespaces to include or exclude
-** Default is to exclude showing namespaces that are part of Clojure,
-   e.g. `clojure.core`, `clojure.set`, `clojure.string`, etc. since
-   these are so common.
-** TBD exactly how.  Maybe an input text file in edn format?
-** TBD: Allow wildcards like `tools.analyzer.jvm.*` ?
+  * Default is to exclude showing namespaces that are part of Clojure,
+    e.g. `clojure.core`, `clojure.set`, `clojure.string`, etc. since
+    these are so common.
+  * TBD exactly how.  Maybe an input text file in edn format?
+  * TBD: Allow wildcards like `tools.analyzer.jvm.*` ?
 
 
 ### Show Java classes and interfaces with their extends/implements relationships
