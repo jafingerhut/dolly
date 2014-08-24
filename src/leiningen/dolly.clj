@@ -78,19 +78,21 @@
      ;; excluded-namespaces, replace it with all namespaces found in
      ;; the directories in (:source-paths opts), in an order that
      ;; honors dependencies, and similarly for :test-paths.
-     ;; nss-in-dirs traverses part of the file system, so only call it
+     ;; namespaces-in-dirs traverses part of the file system, so only call it
      ;; once for each of :source-paths and :test-paths, and only if
      ;; needed.
      (let [source-paths (if (some #(= % :source-paths)
                                   (concat namespaces excluded-namespaces))
-                          (ns/nss-in-dirs (:source-paths opts)
-                                       {:debug-desc (str ":source-paths "
-                                                         (seq (:source-paths opts)))}))
+                          (ns/namespaces-in-dirs
+                           (:source-paths opts)
+                           {:debug-desc (str ":source-paths "
+                                             (seq (:source-paths opts)))}))
            test-paths (if (some #(= % :test-paths)
                                 (concat namespaces excluded-namespaces))
-                        (ns/nss-in-dirs (:test-paths opts)
-                                     {:debug-desc (str ":test-paths "
-                                                       (seq (:test-paths opts)))}))
+                        (ns/namespaces-in-dirs
+                         (:test-paths opts)
+                         {:debug-desc (str ":test-paths "
+                                           (seq (:test-paths opts)))}))
            namespaces (replace-ns-keywords namespaces source-paths test-paths)
            namespaces (distinct namespaces)
            excluded-namespaces (set (replace-ns-keywords excluded-namespaces

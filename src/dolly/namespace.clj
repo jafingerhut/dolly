@@ -126,7 +126,7 @@
         (show ns 0)))))
 
 
-(defn nss-in-dirs
+(defn namespaces-in-dirs
   [dir-name-strs opts]
   (let [dir-name-strs (map canonical-filename dir-name-strs)
         mismatches (filename-namespace-mismatches dir-name-strs)]
