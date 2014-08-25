@@ -1,4 +1,4 @@
-The keys of the tracker returned by dir/scan-all are as follows:
+The keys of the tracker returned by `dir/scan-all` are as follows:
 
 # key :clojure.tools.namespace.dir/time
 
