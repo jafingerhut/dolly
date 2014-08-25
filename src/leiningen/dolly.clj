@@ -133,13 +133,13 @@ Found these non-strings:")
 
 
 (defn handle-errwarn [info]
+  (when (:warn info)
+    (print (:warn-msg info))
+    (flush))
   (when (:err info)
     (print (:err-msg info))
     (flush)
-    (System/exit 1))
-  (when (:warn info)
-    (print (:warn-msg info))
-    (flush)))
+    (System/exit 1)))
 
 
 (defn dolly
@@ -165,7 +165,7 @@ Found these non-strings:")
             graph-args (ns/ns-info->graph-args ns-info)]
         (if (contains? #{nil :text :dot} (:format ns-info))
           ;; Then don't require rhizome.viz, since by default it pops
-          ;; up another JVM GUI-related icon in the doc on Mac OS X.
+          ;; up another JVM GUI-related icon in the Dock on Mac OS X.
           (case (:format ns-info)
             (nil :text) (do
                           (println "Dependencies:")

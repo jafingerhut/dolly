@@ -46,6 +46,38 @@
 
 
 (defn canonical-filename
+  "Returns the canonical file name for the given file name.  A
+canonical file name is platform dependent, but is both absolute and
+unique.  See the Java docs for getCanonicalPath for some more details,
+and the examples below.
+
+    http://docs.oracle.com/javase/7/docs/api/java/io/File.html#getCanonicalPath%28%29
+
+Examples:
+
+Context: A Linux or Mac OS X system, where the current working
+directory is /Users/jafinger/clj/dolly
+
+user=> (ns/canonical-filename \"README.md\")
+\"/Users/jafinger/clj/dolly/README.md\"
+
+user=> (ns/canonical-filename \"../../Documents/\")
+\"/Users/jafinger/Documents\"
+
+user=> (ns/canonical-filename \"../.././clj/../Documents/././\")
+\"/Users/jafinger/Documents\"
+
+Context: A Windows 7 system, where the current working directory is
+C:\\Users\\jafinger\\clj\\dolly
+
+user=> (ns/canonical-filename \"README.md\")
+\"C:\\Users\\jafinger\\clj\\dolly\\README.md\"
+
+user=> (ns/canonical-filename \"..\\..\\Documents\\\")
+\"C:\\Users\\jafinger\\Documents\"
+
+user=> (ns/canonical-filename \"..\\..\\.\\clj\\..\\Documents\\.\\.\\\")
+\"C:\\Users\\jafinger\\Documents\""
   [fname]
   (let [^java.io.File f (if (instance? java.io.File fname)
                           fname
@@ -54,6 +86,27 @@
 
 
 (defn clj-filename-to-ns
+  "Perform the opposite transformation as ns-to-clj-filename,
+i.e. from a string representing a Clojure filename to a symbol of its
+namespace name.  Underscores are converted to dashes, and
+platform-specific path separators to dots.
+
+Examples:
+
+Context: A Linux or Mac OS X system
+
+user=> (clj-filename-to-ns \"com/example/my_ns.clj\")
+com.example.my-ns
+
+Context: A Windows 7 system
+
+user=> (clj-filename-to-ns \"com\\example\\my_ns.clj\")
+com.example.my-ns
+
+;; You probably don't ever want to give a file name like this on a
+;; Windows system.
+user=> (clj-filename-to-ns \"com/example/my_ns.clj\")
+com/examples/my-ns"
   [fname]
   (-> fname
       (str/replace-first #".clj$" "")
@@ -63,6 +116,22 @@
 
 
 (defn ns-to-clj-filename
+  "Take a symbol or other stringable thing that produces a string that
+looks like a namespace.  Convert it to a Clojure source file name.
+Dashes converted to underscores, and dots to a platform-specific path
+separator.
+
+Examples:
+
+Context: A Linux or Mac OS X system
+
+user=> (ns-to-clj-filename 'com.example.my-ns)
+\"com/example/my_ns.clj\"
+
+Context: A Windows 7 system
+
+user=> (ns-to-clj-filename 'com.example.my-ns)
+\"com\\example\\my_ns.clj\""
   [namespace]
   (str (-> namespace
            str
@@ -193,8 +262,7 @@ file and namespace to avoid name collisions."))})
 (defn before?
   "True if x comes before y in an ordered collection.  Also returns
 true if only x is in the collection, or neither x nor y is in the
-collection.  Returns false only if y is found before an occurrence of
-x is found."
+collection.  Returns false only if y is found before x."
   [coll x y]
   (loop [[item & more] (seq coll)]
     (cond (nil? item) true  ; end of the seq
@@ -204,7 +272,7 @@ x is found."
 
 
 (defn tracker-dependency-pairs
-  "From :dependencies in the tracker, return a list of 2-element
+  "From :dependencies in the tracker, return a sequence of 2-element
 vectors [a b], where a and b are symbols representing namespaces, and
 a requires or uses b."
   [tracker]
@@ -216,7 +284,7 @@ a requires or uses b."
 
 
 (defn tracker-dependent-pairs
-  "From :dependencies in the tracker, return a list of 2-element
+  "From :dependents in the tracker, return a sequence of 2-element
 vectors [a b], where a and b are symbols representing namespaces, and
 a requires or uses b."
   [tracker]
@@ -242,18 +310,16 @@ load or unload order in the tracker."
         unload-set (set unload-order)
         dependency-pairs (tracker-dependency-pairs tracker)
         dependent-pairs (tracker-dependent-pairs tracker)
-        load-order-violations (filter (fn [[a b]]
-                                        (and (load-set a)
-                                             (load-set b)
-                                             (before? load-order a b)))
-                                      (concat dependency-pairs
-                                              dependent-pairs))
-        unload-order-violations (filter (fn [[a b]]
-                                          (and (unload-set a)
-                                               (unload-set b)
-                                               (before? unload-order b a)))
-                                        (concat dependency-pairs
-                                                dependent-pairs))]
+        load-order-violations (filter
+                               (fn [[a b]]
+                                 (and (load-set a) (load-set b)
+                                      (before? load-order a b)))
+                               (concat dependency-pairs dependent-pairs))
+        unload-order-violations (filter
+                                 (fn [[a b]]
+                                   (and (unload-set a) (unload-set b)
+                                        (before? unload-order b a)))
+                                 (concat dependency-pairs dependent-pairs))]
     (if (or (seq load-order-violations)
             (seq unload-order-violations))
       {:load (seq load-order-violations)
