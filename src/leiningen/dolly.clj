@@ -170,7 +170,9 @@ Found these non-strings:")
             (nil :text) (do
                           (println "Dependencies:")
                           (ns/print-ns-deps-text ns-info))
-            :dot (spit "nsdeps.dot" (apply dot/graph->dot graph-args)))
+            :dot (let [dot-fname "nsdeps.dot"]
+                   (spit dot-fname (apply dot/graph->dot graph-args))
+                   (println "Wrote file" dot-fname)))
           (do
             (require 'rhizome.viz)
             (let [graph->svg (ns-resolve 'rhizome.viz 'graph->svg)
@@ -178,9 +180,12 @@ Found these non-strings:")
                   save-image (ns-resolve 'rhizome.viz 'save-image)
                   view-graph (ns-resolve 'rhizome.viz 'view-graph)]
               (case (:format ns-info)
-                :svg (spit "nsdeps.svg" (apply graph->svg graph-args))
-                :png (save-image (apply graph->image graph-args)
-                                 "nsdeps.png")
+                :svg (let [svg-fname "nsdeps.svg"]
+                       (spit svg-fname (apply graph->svg graph-args))
+                       (println "Wrote file" svg-fname))
+                :png (let [png-fname "nsdeps.png"]
+                       (save-image (apply graph->image graph-args) png-fname)
+                       (println "Wrote file" png-fname))
                 :window (do
                           (apply view-graph graph-args)
                           ;; TBD: If I don't do something to delay the
