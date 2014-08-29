@@ -18,7 +18,7 @@ Dolly was developing the [Eastwood][Eastwood] Clojure lint tool.
 
 [Leiningen]: http://leiningen.org/
 [plugin]: https://github.com/technomancy/leiningen/blob/stable/doc/PLUGINS.md
-[Eastwood] https://github.com/jonase/eastwood
+[Eastwood]: https://github.com/jonase/eastwood
 
 Formerly Eastwood had dependencies on commonly used Clojure libraries
 like [`core.memoize`][cmemoize] and [`core.cache`][ccache].  During
