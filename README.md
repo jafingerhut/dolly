@@ -1,19 +1,79 @@
-# dolly
+# Dolly
 
-Goal: Become a Leiningen plugin to clone source code of other Clojure
-projects into your Clojure project, optionally with the namespaces
-renamed.
+Primary goal: Make it easy to clone source code of other Clojure
+projects into your Clojure project, with the option to rename the
+namespaces.
 
-This is useful in a limited set of circumstances.  For example, the
-Eastwood Clojure lint tool copies the source code of several other
-Clojure libraries into it, and renames them, because then it can use a
-particular version of those libraries, and yet still analyze and eval
-the code of projects it lints that also use those libraries, without
-conflict.
+Secondary goals: Provide utilities to Clojure developers for
+investigating dependencies between namespaces within your Leiningen
+project, and between Java classes and interfaces.
 
-Secondary goals: Implement developer utilities for investigating
-dependencies between namespaces within your Leiningen project, and
-between Java classes and interfaces.
+
+## Motivation
+
+The primary goal of cloning source code is probably most useful for
+developing [Leiningen][Leiningen] [plugins][plugin], but there may be
+other use cases I have not thought of.  The motivation for creating
+Dolly was developing the [Eastwood][Eastwood] Clojure lint tool.
+
+[Leiningen]: http://leiningen.org/
+[plugin]: https://github.com/technomancy/leiningen/blob/stable/doc/PLUGINS.md
+[Eastwood] https://github.com/jonase/eastwood
+
+Formerly Eastwood had dependencies on commonly used Clojure libraries
+like [`core.memoize`][cmemoize] and [`core.cache`][ccache].  During
+linting, Eastwood reads, analyzes, and _evaluates_ Clojure source code
+of projects being linted.
+
+[cmemoize]: https://github.com/clojure/core.memoize
+[ccache]: https://github.com/clojure/core.cache
+
+If a linted project also used `core.memoize` or `core.cache`, then
+because they have the same namespaces, only one version of those
+namespaces can be loaded into Clojure.  If they use identical versions
+of the library, there are no problems.
+
+However, if the linted project and Eastwood used different versions of
+the libraries, and those versions had differences in their API, then
+either Eastwood or the linted project would get exceptions due to
+missing functions, function calls with incorrect number of arguments,
+etc.
+
+To avoid this problem, Eastwood now has in its own source code a copy
+of `core.cache`, `core.memoize`, and several other Clojure libraries.
+The namespaces of these libraries have been renamed, e.g.
+`clojure.core.cache` has been renamed
+`eastwood.copieddeps.dep4.clojure.core.cache`.  Eastwood only uses the
+renamed version for its own purposes, leaving the namespace
+`clojure.core.cache` available for the linted project's use.
+
+There is currently no need for communication of data between
+Eastwood's renamed version and the projects being linted.  If there
+were such a need, this copy-and-rename technique would not be
+sufficient in all cases.
+
+For the first few versions of Eastwood that used this technique, this
+copying and renaming was done manually.  While not difficult, this is
+tedious, and makes it more time consuming to upgrade to newer versions
+of the libraries that Eastwood uses as they become available.  Thus
+Dolly was born.
+
+Stuart Sierra has implemented in the namespace
+`clojure.tools.namespace.move` of his [`tools.namespace`][tnamespace]
+library something very similar to this, except it is only intended to
+rename a namespace that is already part of a Clojure project.  I have
+learned from and used this library in Dolly, and the only things Dolly
+really adds on top of it are the copying of files from outside your
+project to inside, followed by the rename, and iterating the process
+over many namespaces.
+
+[tnamespace]: https://github.com/clojure/tools.namespace
+
+A potential side benefit of this copy-and-rename technique is that you
+may easily modify your copy of the library, e.g. if there are bugs in
+it or enhancements appropriate for your use case.  That leaves the
+responsibility on you to maintain such modifications if and when you
+move to newer versions of that library.
 
 
 ## Installation and Quick Usage
@@ -29,10 +89,10 @@ FIXME: and add an example usage that actually makes sense:
 
 ## Usage
 
-Things you can do with dolly:
+Things you can do with Dolly:
 
-* TBD: List, add, upgrade, and remove namespaces cloned from other projects
 * Show all namespaces with their dependencies
+* TBD: List, add, upgrade, and remove namespaces cloned from other projects
 * TBD: Show Java classes and interfaces with their extends/implements relationships
 
 
@@ -48,12 +108,12 @@ on the only copy of your source code, or to commit the changed version
 to anything but an experimental development branch, until the changes
 have been reviewed and tested.
 
-Information about namespaces that dolly has been used to clone into
+Information about namespaces that Dolly has been used to clone into
 your project are stored in a file `dolly.edn` in the root directory of
 your project.  This file should be kept under revision control with
 the rest of the files in your project.
 
-List info about any namespaces that dolly has previously been used to
+List info about any namespaces that Dolly has previously been used to
 clone into your project:
 
     $ lein dolly list-clones
@@ -131,30 +191,22 @@ TBD: Give example of this to make it clearer.
 You may also use the long form 'namespaces' instead of 'ns'.  The
 default behavior is:
 
-* Show all namespaces defined in some file in your Leiningen project
-  `:source-paths` and their subdirectories.
+* Show all namespaces defined in some Clojure file in your Leiningen
+  project `:source-paths` and their subdirectories.
 * Also show any namespaces required or used by those namespaces.
 * Do not show namespaces that are part of Clojure,
    e.g. `clojure.core`, `clojure.set`, `clojure.string`, etc. since
    these are so common.
 
 `:source-paths` is the vector of one directory `[ "src" ]` if you do
-not override it in your `project.clj` file.
+not override it in your Leiningen `project.clj` file.
 
 Options controlling the form of output:
 
-* Show them in text on the standard output (default)
+* Show namespace dependencies in text on the standard output (default)
 * Create a Graphviz dot file
 * Create a PNG file
 * Create a window showing the dependency graph
-
-TBD: Look at these projects for inspiration and ideas here.  Don't be
-afraid to create more options for controlling the output.
-
-* [`lein-ns-dep-graph`](https://github.com/hilverd/lein-ns-dep-graph)
-* [`nephila`](https://github.com/timmc/nephila)
-* [`lacij`](https://github.com/pallix/lacij)
-
 
 Options controlling the namespaces to show:
 
@@ -173,6 +225,13 @@ Options controlling the namespaces to show:
     these are so common.
   * TBD exactly how.  Maybe an input text file in edn format?
   * TBD: Allow wildcards like `tools.analyzer.jvm.*` ?
+
+TBD: Look at these projects for inspiration and ideas here.  Don't be
+afraid to create more options for controlling the output.
+
+* [`lein-ns-dep-graph`](https://github.com/hilverd/lein-ns-dep-graph)
+* [`nephila`](https://github.com/timmc/nephila)
+* [`lacij`](https://github.com/pallix/lacij)
 
 
 ### Show Java classes and interfaces with their extends/implements relationships
