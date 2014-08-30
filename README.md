@@ -188,6 +188,73 @@ TBD: Give example of this to make it clearer.
     $ lein dolly ns
     $ lein dolly ns '{ <option key/value pairs> }'
 
+By default the namespace dependencies are shown in text format.  For
+example, here is the text output for `tools.reader` version 0.8.7:
+
+    Dependencies:
+      1 clojure.tools.nrepl.helpers
+      2   clojure.tools.nrepl.middleware.load-file
+      3     clojure.tools.nrepl.middleware
+      4       clojure.tools.nrepl
+      5         clojure.tools.nrepl.misc
+      6         clojure.tools.nrepl.transport
+      7           clojure.tools.nrepl.bencode
+                  clojure.tools.nrepl.misc
+              clojure.tools.nrepl.misc
+              clojure.tools.nrepl.transport  [6]
+      8     clojure.tools.nrepl.middleware.interruptible-eval
+              clojure.tools.nrepl.middleware  [3]
+      9       clojure.tools.nrepl.middleware.pr-values
+                clojure.tools.nrepl.middleware  [3]
+                clojure.tools.nrepl.transport  [6]
+              clojure.tools.nrepl.misc
+              clojure.tools.nrepl.transport  [6]
+     10 clojure.tools.nrepl.cmdline
+          clojure.tools.nrepl  [4]
+     11   clojure.tools.nrepl.ack
+            clojure.tools.nrepl  [4]
+            clojure.tools.nrepl.transport  [6]
+     12   clojure.tools.nrepl.server
+            clojure.tools.nrepl  [4]
+            clojure.tools.nrepl.ack  [11]
+            clojure.tools.nrepl.middleware  [3]
+            clojure.tools.nrepl.middleware.interruptible-eval  [8]
+            clojure.tools.nrepl.middleware.load-file  [2]
+            clojure.tools.nrepl.middleware.pr-values  [9]
+     13     clojure.tools.nrepl.middleware.session
+              clojure.tools.nrepl.middleware  [3]
+              clojure.tools.nrepl.middleware.interruptible-eval  [8]
+              clojure.tools.nrepl.misc
+              clojure.tools.nrepl.transport  [6]
+            clojure.tools.nrepl.misc
+            clojure.tools.nrepl.transport  [6]
+          clojure.tools.nrepl.transport  [6]
+
+The lines beginning with numbers represent the first time a particular
+namespace appears in the output.  No leading number means the
+namespace appears somewhere earlier in the output.
+
+Indented lines indicate dependencies, with indent level showing nested
+dependencies.  For example, `clojure.tools.nrepl` (leading number 4)
+requires or uses namespaces `clojure.tools.nrepl.misc` and
+`clojure.tools.nrepl.transport` directly.
+`clojure.tools.nrepl.transport` in turn requires or uses namespace
+`clojure.tools.nrepl.bencode` and `clojure.tools.nrepl.misc` directly.
+
+If there is a number in square brackets at the end of a line, it means
+that the namespace had one or more children shown earlier, and the
+number is the leading number on the line where it was first shown.
+The 'descendents' of a namespace are shown only once, the first time
+the namespace is shown.  For example, everywhere above where
+`clojure.tools.nrepl.middleware` is shown, except the first time, it
+is followed by 3 in brackets.
+
+If there is no leading number and no following number in brackets, it
+means the namespace was shown earlier, but it had no children shown.
+For example, `clojure.tools.nrepl.misc` appears multiple times in the
+output above, but never has a number after it, because it has no
+children shown.
+
 You may also use the long form 'namespaces' instead of 'ns'.  The
 default behavior is:
 
@@ -225,6 +292,10 @@ Options controlling the namespaces to show:
     these are so common.
   * TBD exactly how.  Maybe an input text file in edn format?
   * TBD: Allow wildcards like `tools.analyzer.jvm.*` ?
+
+TBD: Options for controlling how to abbreviate namespaces shown.
+Making long.name.spaces.shorter can go a long way to making the output
+easier to read.
 
 TBD: Look at these projects for inspiration and ideas here.  Don't be
 afraid to create more options for controlling the output.
