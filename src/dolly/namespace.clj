@@ -195,8 +195,11 @@ user=> (ns-to-clj-filename 'com.example.my-ns)
                                      ns-info))
         ns-number (atom 1)
         shown-namespaces (atom {})
-        show (fn show [ns level]
+        namespace-showed-children (atom #{})
+        show (fn show [ns level parent-ns]
                (when (should-show-namespace? ns show-opts)
+                 (when parent-ns
+                   (swap! namespace-showed-children conj parent-ns))
                  (let [ns-already-printed-number (@shown-namespaces ns)
                        next-ns-number @ns-number]
                    (if ns-already-printed-number
@@ -208,16 +211,16 @@ user=> (ns-to-clj-filename 'com.example.my-ns)
                    (dotimes [i level] (print "  "))
                    (print ns)
                    (when (and ns-already-printed-number
-                              (not (empty? (dependencies ns))))
+                              (contains? @namespace-showed-children ns))
                      (print (format "  [%d]" ns-already-printed-number)))
                    (println)
                    (when-not ns-already-printed-number
                      (doseq [child-ns (sort (dependencies ns))]
-                       (show child-ns (inc level)))
+                       (show child-ns (inc level) ns))
                      (swap! shown-namespaces assoc ns next-ns-number)))))]
     (doseq [ns nss-unload-order]
       (when-not (@shown-namespaces ns)
-        (show ns 0)))))
+        (show ns 0 nil)))))
 
 
 (defn ns-info->graph-args [ns-info]
