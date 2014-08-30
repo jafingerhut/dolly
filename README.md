@@ -189,7 +189,8 @@ TBD: Give example of this to make it clearer.
     $ lein dolly ns '{ <option key/value pairs> }'
 
 By default the namespace dependencies are shown in text format.  For
-example, here is the text output for `tools.reader` version 0.8.7:
+example, here is part of the text output for `tools.nrepl` version
+0.2.4:
 
     Dependencies:
       1 clojure.tools.nrepl.helpers
@@ -209,26 +210,8 @@ example, here is the text output for `tools.reader` version 0.8.7:
                 clojure.tools.nrepl.transport  [6]
               clojure.tools.nrepl.misc
               clojure.tools.nrepl.transport  [6]
-     10 clojure.tools.nrepl.cmdline
-          clojure.tools.nrepl  [4]
-     11   clojure.tools.nrepl.ack
-            clojure.tools.nrepl  [4]
-            clojure.tools.nrepl.transport  [6]
-     12   clojure.tools.nrepl.server
-            clojure.tools.nrepl  [4]
-            clojure.tools.nrepl.ack  [11]
-            clojure.tools.nrepl.middleware  [3]
-            clojure.tools.nrepl.middleware.interruptible-eval  [8]
-            clojure.tools.nrepl.middleware.load-file  [2]
-            clojure.tools.nrepl.middleware.pr-values  [9]
-     13     clojure.tools.nrepl.middleware.session
-              clojure.tools.nrepl.middleware  [3]
-              clojure.tools.nrepl.middleware.interruptible-eval  [8]
-              clojure.tools.nrepl.misc
-              clojure.tools.nrepl.transport  [6]
-            clojure.tools.nrepl.misc
-            clojure.tools.nrepl.transport  [6]
-          clojure.tools.nrepl.transport  [6]
+
+     [ rest of output omitted for brevity ]
 
 The lines beginning with numbers represent the first time a particular
 namespace appears in the output.  No leading number means the
@@ -244,15 +227,15 @@ requires or uses namespaces `clojure.tools.nrepl.misc` and
 If there is a number in square brackets at the end of a line, it means
 that the namespace had one or more children shown earlier, and the
 number is the leading number on the line where it was first shown.
-The 'descendents' of a namespace are shown only once, the first time
-the namespace is shown.  For example, everywhere above where
-`clojure.tools.nrepl.middleware` is shown, except the first time, it
-is followed by 3 in brackets.
+The descendents of a namespace are shown only once, the first time the
+namespace is shown.  Above, everywhere where
+`clojure.tools.nrepl.middleware` is shown, it is followed by 3 in
+brackets (except the first time).
 
 If there is no leading number and no following number in brackets, it
 means the namespace was shown earlier, but it had no children shown.
 For example, `clojure.tools.nrepl.misc` appears multiple times in the
-output above, but never has a number after it, because it has no
+output above, but never has a number after it because it has no
 children shown.
 
 You may also use the long form 'namespaces' instead of 'ns'.  The
