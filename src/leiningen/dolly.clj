@@ -162,6 +162,8 @@ Found these non-strings:")
             _ (handle-errwarn ns-opts)
             ns-info (ns/namespaces-in-dirs ns-opts)
             _ (handle-errwarn ns-info)
+;;            _ (println "jafinger-dbg: ns-info")
+;;            _ (pp/pprint ns-info)
             graph-args (ns/ns-info->graph-args ns-info)]
         (if (contains? #{nil :text :dot} (:format ns-info))
           ;; Then don't require rhizome.viz, since by default it pops
@@ -179,22 +181,31 @@ Found these non-strings:")
                   graph->image (ns-resolve 'rhizome.viz 'graph->image)
                   save-image (ns-resolve 'rhizome.viz 'save-image)
                   view-graph (ns-resolve 'rhizome.viz 'view-graph)]
-              (case (:format ns-info)
-                :svg (let [svg-fname "nsdeps.svg"]
-                       (spit svg-fname (apply graph->svg graph-args))
-                       (println "Wrote file" svg-fname))
-                :png (let [png-fname "nsdeps.png"]
-                       (save-image (apply graph->image graph-args) png-fname)
-                       (println "Wrote file" png-fname))
-                :window (do
-                          (apply view-graph graph-args)
-                          ;; TBD: If I don't do something to delay the
-                          ;; program exiting here, the window is shown
-                          ;; but then is closed immediately.  Is there a
-                          ;; way to make this program end only when
-                          ;; someone closes the new window?
-                          (println "Delaying quitting until you press return, otherwise the new window will close:")
-                          (read-line)))))))
+              (try
+                (case (:format ns-info)
+                  :svg (let [svg-fname "nsdeps.svg"]
+                         (spit svg-fname (apply graph->svg graph-args))
+                         (println "Wrote file" svg-fname))
+                  :png (let [png-fname "nsdeps.png"]
+                         (save-image (apply graph->image graph-args) png-fname)
+                         (println "Wrote file" png-fname))
+                  :window (do
+                            (apply view-graph graph-args)
+                            ;; TBD: If I don't do something to delay the
+                            ;; program exiting here, the window is shown
+                            ;; but then is closed immediately.  Is there a
+                            ;; way to make this program end only when
+                            ;; someone closes the new window?
+                            (println "Delaying quitting until you press return, otherwise the new window will close:")
+                            (read-line)))
+                (catch java.io.IOException e
+                  (let [msg (.getMessage e)]
+                    (if (re-find #"Cannot run program \"dot\".* No such file" msg)
+                      (binding [*out* *err*]
+                        (println (format "Could not find program 'dot'.
+Output format %s requires installing Graphviz (http://www.graphviz.org)"
+                                         (:format ns-info))))
+                      (throw e)))))))))
       
       ("ls" "list-clones")
       (println "list-clones not implemented yet")
