@@ -254,8 +254,8 @@ with their file names:")
        (println (format "    should have namespace: %s" recommended-namespace))
        (println (format "    or should be in file : %s" recommended-fname)))
      (println "
-No other linting checks will be performed until these problems have
-been corrected.
+No other operations will be performed until these problems have been
+corrected.
 
 The 'should have namespace' and 'should be in file' messages above are
 merely suggestions.  It may be better in your case to rename both the
