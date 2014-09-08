@@ -114,6 +114,16 @@ Found these non-strings:")
          (println (str (seq nonexistent-paths))))})))
 
 
+(defn handle-errwarn [info]
+  (when (:warn info)
+    (print (:warn-msg info))
+    (flush))
+  (when (:err info)
+    (print (:err-msg info))
+    (flush)
+    (System/exit 1)))
+
+
 (defn calc-ns-opts
   [project cmd-opts]
   (let [paths (or (:paths cmd-opts) [:source-paths])]
@@ -126,20 +136,64 @@ Found these non-strings:")
        (or
         (non-string-paths paths)
         (nonexistent-paths paths)
-        (merge
-         {:namespace-show-opts [{:exclude ns/clojure-core-namespaces}]}
-         cmd-opts
-         {:err nil, :paths paths}))))))
+        (merge {:namespace-show-opts [{:exclude ns/clojure-core-namespaces}]}
+               cmd-opts
+               {:err nil, :paths paths}))))))
 
 
-(defn handle-errwarn [info]
-  (when (:warn info)
-    (print (:warn-msg info))
-    (flush))
-  (when (:err info)
-    (print (:err-msg info))
-    (flush)
-    (System/exit 1)))
+(defn dolly-ns
+  [project cmdline-args]
+  (let [cmd-opts (if-let [s (first cmdline-args)]
+                   (edn/read-string s)
+                   {})
+        ns-opts (calc-ns-opts project cmd-opts)
+        _ (handle-errwarn ns-opts)
+        ns-info (ns/namespaces-in-dirs ns-opts)
+        _ (handle-errwarn ns-info)
+;;        _ (println "jafinger-dbg: ns-info")
+;;        _ (pp/pprint ns-info)
+        graph-args (ns/ns-info->graph-args ns-info)]
+    (if (contains? #{nil :text :dot} (:format ns-info))
+      ;; Then don't require rhizome.viz, since by default it pops
+      ;; up another JVM GUI-related icon in the Dock on Mac OS X.
+      (case (:format ns-info)
+        (nil :text) (do
+                      (println "Dependencies:")
+                      (ns/print-ns-deps-text ns-info))
+        :dot (let [dot-fname "nsdeps.dot"]
+               (spit dot-fname (apply dot/graph->dot graph-args))
+               (println "Wrote file" dot-fname)))
+      (do
+        (require 'rhizome.viz)
+        (let [graph->svg (ns-resolve 'rhizome.viz 'graph->svg)
+              graph->image (ns-resolve 'rhizome.viz 'graph->image)
+              save-image (ns-resolve 'rhizome.viz 'save-image)
+              view-graph (ns-resolve 'rhizome.viz 'view-graph)]
+          (try
+            (case (:format ns-info)
+              :svg (let [svg-fname "nsdeps.svg"]
+                     (spit svg-fname (apply graph->svg graph-args))
+                     (println "Wrote file" svg-fname))
+              :png (let [png-fname "nsdeps.png"]
+                     (save-image (apply graph->image graph-args) png-fname)
+                     (println "Wrote file" png-fname))
+              :window (do
+                        (apply view-graph graph-args)
+                        ;; TBD: If I don't do something to delay the
+                        ;; program exiting here, the window is shown
+                        ;; but then is closed immediately.  Is there a
+                        ;; way to make this program end only when
+                        ;; someone closes the new window?
+                        (println "Delaying quitting until you press return, otherwise the new window will close:")
+                        (read-line)))
+            (catch java.io.IOException e
+              (let [msg (.getMessage e)]
+                (if (re-find #"Cannot run program \"dot\".* No such file" msg)
+                  (binding [*out* *err*]
+                    (println (format "Could not find program 'dot'.
+Output format %s requires installing Graphviz (http://www.graphviz.org)"
+                                     (:format ns-info))))
+                  (throw e))))))))))
 
 
 (defn dolly
@@ -155,57 +209,7 @@ Found these non-strings:")
       (dolly-help args)
       
       ("ns" "namespaces")
-      (let [cmd-opts (if-let [s (first args)]
-                       (edn/read-string s)
-                       {})
-            ns-opts (calc-ns-opts project cmd-opts)
-            _ (handle-errwarn ns-opts)
-            ns-info (ns/namespaces-in-dirs ns-opts)
-            _ (handle-errwarn ns-info)
-;;            _ (println "jafinger-dbg: ns-info")
-;;            _ (pp/pprint ns-info)
-            graph-args (ns/ns-info->graph-args ns-info)]
-        (if (contains? #{nil :text :dot} (:format ns-info))
-          ;; Then don't require rhizome.viz, since by default it pops
-          ;; up another JVM GUI-related icon in the Dock on Mac OS X.
-          (case (:format ns-info)
-            (nil :text) (do
-                          (println "Dependencies:")
-                          (ns/print-ns-deps-text ns-info))
-            :dot (let [dot-fname "nsdeps.dot"]
-                   (spit dot-fname (apply dot/graph->dot graph-args))
-                   (println "Wrote file" dot-fname)))
-          (do
-            (require 'rhizome.viz)
-            (let [graph->svg (ns-resolve 'rhizome.viz 'graph->svg)
-                  graph->image (ns-resolve 'rhizome.viz 'graph->image)
-                  save-image (ns-resolve 'rhizome.viz 'save-image)
-                  view-graph (ns-resolve 'rhizome.viz 'view-graph)]
-              (try
-                (case (:format ns-info)
-                  :svg (let [svg-fname "nsdeps.svg"]
-                         (spit svg-fname (apply graph->svg graph-args))
-                         (println "Wrote file" svg-fname))
-                  :png (let [png-fname "nsdeps.png"]
-                         (save-image (apply graph->image graph-args) png-fname)
-                         (println "Wrote file" png-fname))
-                  :window (do
-                            (apply view-graph graph-args)
-                            ;; TBD: If I don't do something to delay the
-                            ;; program exiting here, the window is shown
-                            ;; but then is closed immediately.  Is there a
-                            ;; way to make this program end only when
-                            ;; someone closes the new window?
-                            (println "Delaying quitting until you press return, otherwise the new window will close:")
-                            (read-line)))
-                (catch java.io.IOException e
-                  (let [msg (.getMessage e)]
-                    (if (re-find #"Cannot run program \"dot\".* No such file" msg)
-                      (binding [*out* *err*]
-                        (println (format "Could not find program 'dot'.
-Output format %s requires installing Graphviz (http://www.graphviz.org)"
-                                         (:format ns-info))))
-                      (throw e)))))))))
+      (dolly-ns project args)
       
       ("ls" "list-clones")
       (println "list-clones not implemented yet")
