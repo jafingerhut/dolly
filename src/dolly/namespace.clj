@@ -302,7 +302,7 @@ a requires or uses b."
   "Returns nil if the tracker has load and unload orders that are
 consistent with its :dependencies and :dependents graphs.  If there
 are inconsistencies, returns a map containing either or both of the
-keys :load or :unload, where the values are a sequence of 2-element
+keys :load or :unload, where the values are a collection of 2-element
 vectors [a b] where a and b are symbols representing namespace names,
 and a requires or uses b, and that dependency order is violated by the
 load or unload order in the tracker."
@@ -313,16 +313,18 @@ load or unload order in the tracker."
         unload-set (set unload-order)
         dependency-pairs (tracker-dependency-pairs tracker)
         dependent-pairs (tracker-dependent-pairs tracker)
-        load-order-violations (filter
-                               (fn [[a b]]
-                                 (and (load-set a) (load-set b)
-                                      (before? load-order a b)))
-                               (concat dependency-pairs dependent-pairs))
-        unload-order-violations (filter
-                                 (fn [[a b]]
-                                   (and (unload-set a) (unload-set b)
-                                        (before? unload-order b a)))
-                                 (concat dependency-pairs dependent-pairs))]
+        load-order-violations (set
+                               (filter
+                                (fn [[a b]]
+                                  (and (load-set a) (load-set b)
+                                       (before? load-order a b)))
+                                (concat dependency-pairs dependent-pairs)))
+        unload-order-violations (set
+                                 (filter
+                                  (fn [[a b]]
+                                    (and (unload-set a) (unload-set b)
+                                         (before? unload-order b a)))
+                                  (concat dependency-pairs dependent-pairs)))]
     (if (or (seq load-order-violations)
             (seq unload-order-violations))
       {:load (seq load-order-violations)
@@ -337,14 +339,19 @@ load or unload order in the tracker."
    (with-out-str
      (when (:load bad-order)
        (println "Namespace tracker load order is:")
-       (println (:clojure.tools.namespace.track/load tracker))
-       (println "It violates the following [a b] dependencies, where a requires or uses b:")
-       (println (:load bad-order)))
+       (pp/pprint (:clojure.tools.namespace.track/load tracker))
+       (println "\nIt violates the following [a b] dependencies, where a requires or uses b:")
+       (pp/pprint (:load bad-order)))
      (when (:unload bad-order)
        (println "Namespace tracker unload order is:")
-       (println (:clojure.tools.namespace.track/unload tracker))
-       (println "It violates the following [a b] dependencies, where a requires or uses b:")
-       (println (:unload bad-order))))})
+       (pp/pprint (:clojure.tools.namespace.track/unload tracker))
+       (println "\nIt violates the following [a b] dependencies, where a requires or uses b:")
+       (pp/pprint (:unload bad-order)))
+     (println "
+This is most likely a bug in tools.namespace, or in the way that Dolly
+uses tools.namespace.  Please report this as an issue for Dolly at:
+
+    https://github.com/jafingerhut/dolly/issues"))})
 
 
 (defn namespaces-in-dirs [opts]
