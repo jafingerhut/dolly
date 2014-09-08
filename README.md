@@ -14,7 +14,8 @@ project, and between Java classes and interfaces.
 The primary goal of cloning source code is probably most useful for
 developing [Leiningen][Leiningen] [plugins][plugin], but there may be
 other use cases I have not thought of.  The motivation for creating
-Dolly was developing the [Eastwood][Eastwood] Clojure lint tool.
+Dolly was to assist in developing the [Eastwood][Eastwood] Clojure
+lint tool.
 
 [Leiningen]: http://leiningen.org/
 [plugin]: https://github.com/technomancy/leiningen/blob/stable/doc/PLUGINS.md
@@ -30,8 +31,8 @@ of projects being linted.
 
 If a linted project also used `core.memoize` or `core.cache`, then
 because they have the same namespaces, only one version of those
-namespaces can be loaded into Clojure.  If they use identical versions
-of the library, there are no problems.
+namespaces can be loaded into Clojure.  If the linted project and
+Eastwood use identical versions of the library, there are no problems.
 
 However, if the linted project and Eastwood used different versions of
 the libraries, and those versions had differences in their API, then
@@ -58,14 +59,14 @@ tedious, and makes it more time consuming to upgrade to newer versions
 of the libraries that Eastwood uses as they become available.  Thus
 Dolly was born.
 
-Stuart Sierra has implemented in the namespace
-`clojure.tools.namespace.move` of his [`tools.namespace`][tnamespace]
-library something very similar to this, except it is only intended to
-rename a namespace that is already part of a Clojure project.  I have
-learned from and used this library in Dolly, and the only things Dolly
-really adds on top of it are the copying of files from outside your
-project to inside, followed by the rename, and iterating the process
-over many namespaces.
+Stuart Sierra created the [`tools.namespace`][tnamespace] library,
+including its `clojure.tools.namespace.move` namespace, which
+implements most of what Dolly does.  It renames a namespace that is
+already part of a Clojure project.  What Dolly adds to this is
+primarily a way to iterate this over many namespaces, and to first
+copy in the source code to a temporary 'staging' directory in your
+project before it is then renamed and moved to a more permanent
+directory.
 
 [tnamespace]: https://github.com/clojure/tools.namespace
 
@@ -98,7 +99,7 @@ Things you can do with Dolly:
 
 ### List, add, upgrade, remove namespaces cloned from other projects
 
-Note: As always, it is your responsibility to repect the licenses of
+Note: As always, it is your responsibility to respect the licenses of
 code you use in your projects.  Dolly makes no attempt to check for
 license compatibility.
 
