@@ -103,10 +103,10 @@ Note: As always, it is your responsibility to respect the licenses of
 code you use in your projects.  Dolly makes no attempt to check for
 license compatibility.
 
-WARNING: Assume this code has bugs, and take appropriate steps to
-protect your source code.  It would be foolhardy to use these commands
-on the only copy of your source code, or to commit the changed version
-to anything but an experimental development branch, until the changes
+WARNING: Assume Dolly has bugs, and take appropriate steps to protect
+your source code.  It would be foolhardy to use these commands on the
+only copy of your source code, or to commit the changed version to
+anything but an experimental development branch, until the changes
 have been reviewed and tested.
 
 Information about namespaces that Dolly has been used to clone into
