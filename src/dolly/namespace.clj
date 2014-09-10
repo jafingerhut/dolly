@@ -223,7 +223,20 @@ user=> (ns-to-clj-filename 'com.example.my-ns)
         (show ns 0 nil)))))
 
 
-(defn ns-info->graph-args [ns-info]
+(defn ns-info->graph-args
+  "ns-info should be a map containing at least the following keys:
+
+  :namespace-show-opts
+
+The following two are from a tools.namespace 'tracker' map:
+
+  :clojure.tools.namespace.track/unload
+  :clojure.tools.namespace.track/deps
+
+Returns a sequence of arguments to be passed to any of the graph->*
+functions from the rhizome library, e.g. graph->dot, graph->svg,
+graph->image."
+  [ns-info]
   (let [show-opts (:namespace-show-opts ns-info)
         nss-unload-order (:clojure.tools.namespace.track/unload ns-info)
 ;;        _ (println "jafinger-dbg: ns-info->graph-args nss-unload-order=" (seq nss-unload-order))
