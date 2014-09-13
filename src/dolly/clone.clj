@@ -6,6 +6,18 @@
   (:import (java.io File)))
 
 
+(defn abbreviate-path
+  "If the string pathname begins with the string to-abbrev (followed
+by the File path separator string), replace that portion of the path
+name with the abbreviation abbrev (followed by the FIle path separator
+string) and return that.  Otherwise return pathname."
+  [^String pathname to-abbrev abbrev]
+  (if (and (string? abbrev)
+           (.startsWith pathname (str to-abbrev File/separator)))
+    (str abbrev (subs pathname (count to-abbrev)))
+    pathname))
+
+
 (defn copy-ns-file
   "Copies the .clj source file (found relative to source-path) for the
 namespace named by the symbol ns-sym to a file for the same namespace,
@@ -13,28 +25,24 @@ but relative to dest-path.
 
 WARNING: This function can overwrite any source file that was already
 at the destination!  Make sure you have a backup or version control."
-  [source-path ns-sym dest-path & [dry-run? source-path-abbrev dest-path-abbrev]]
+  [source-path ns-sym dest-path opts]
   (let [ns-fname (#'move/ns-file-name ns-sym)
         old-file (io/file source-path ns-fname)
         new-file (io/file dest-path ns-fname)]
-    (if dry-run?
-      (str (format "mkdir %s\n"
-                   (let [full-path (str (.getParentFile new-file))]
-                     (if dest-path-abbrev
-                       (str/replace-first full-path
-                                          (str dest-path File/separator)
-                                          dest-path-abbrev)
-                       full-path)))
-           (format "copy %s %s\n"
-                   (if source-path-abbrev
-                     (str source-path-abbrev ns-fname)
-                     (str old-file))
-                   (if dest-path-abbrev
-                     (str dest-path-abbrev ns-fname)
-                     (str new-file))))
-      (do
-        (.mkdirs (.getParentFile new-file))
-        (io/copy old-file new-file)))))
+    (when (:print? opts)
+      (println (format "mkdir %s"
+                       (abbreviate-path (str (.getParentFile new-file))
+                                        dest-path (:dest-path-abbrev opts)))))
+    (when-not (:dry-run? opts)
+      (.mkdirs (.getParentFile new-file)))
+    (when (:print? opts)
+      (println (format "copy %s %s"
+                       (abbreviate-path (str old-file) source-path
+                                        (:source-path-abbrev opts))
+                       (abbreviate-path (str new-file) dest-path
+                                        (:dest-path-abbrev opts)))))
+    (when-not (:dry-run? opts)
+      (io/copy old-file new-file))))
 
 
 (defn namespace-to-copy? [ns root-ns]
@@ -59,37 +67,32 @@ and no files are copied.
 For example, if source-path is /source/path and it contains a file
 /source/path/one/two.clj, it will be an error if the namespace inside
 is anything other than 'one.two'."
-  [source-path ns-sym dest-path dry-run?]
+  [source-path ns-sym dest-path opts]
   (let [ns-info (ns/namespaces-in-dirs {:paths [source-path]})]
     (if (:err ns-info)
       ns-info
-      (if dry-run?
-        {:err nil
-         :dry-run-msgs
-         (cons
-          (format "Copy Clojure source files in namespace %s unmodified\n  from source path S='%s'\n  to dest path D='%s'\n"
-                  ns-sym source-path dest-path)
-          (for [[file ns] (:clojure.tools.namespace.file/filemap ns-info)]
-            (let [source-path-abbrev (str "S" File/separator)
-                  dest-path-abbrev (str "D" File/separator)]
-              (if (namespace-to-copy? ns ns-sym)
-                (copy-ns-file source-path ns dest-path
-                              dry-run? source-path-abbrev dest-path-abbrev)
-                (format "Don't copy namespace %s from S since it is not a 'sub-namespace' of %s\n"
-                        ns ns-sym)))))}
+      (do
+        (when (:print? opts)
+          (println (format "Copy Clojure source files in namespace %s unmodified\n  from source path S='%s'\n  to dest path D='%s'"
+                           ns-sym source-path dest-path)))
         (doseq [[file ns] (:clojure.tools.namespace.file/filemap ns-info)]
-          (when (namespace-to-copy? ns ns-sym)
-            (copy-ns-file source-path ns dest-path dry-run?)))))))
+          (if (namespace-to-copy? ns ns-sym)
+            (copy-ns-file source-path ns dest-path
+                          (merge opts {:source-path-abbrev "S"
+                                       :dest-path-abbrev "D"}))
+            (when (:print? opts)
+              (println (format "Don't copy namespace %s from S since it is not a 'sub-namespace' of %s"
+                               ns ns-sym)))))))))
 
 
 (comment
 (require '[dolly.clone :as c])
 (def tns-path "/Users/jafinger/clj/dolly/copy-deps/tools.namespace/src/main/clojure")
 (def staging-path "/Users/jafinger/clj/dolly/staging")
-(def o1 (c/copy-namespaces-unmodified tns-path 'clojure.tools.namespace staging-path true))
-(print (apply str (:dry-run-msgs o1)))
-(def o2 (c/copy-namespaces-unmodified tns-path 'clojure.tools.namespace.dir staging-path true))
-(print (apply str (:dry-run-msgs o2)))
+(def o1 (c/copy-namespaces-unmodified tns-path 'clojure.tools.namespace staging-path {:dry-run? true :print? true}))
+;;(print (apply str (:dry-run-msgs o1)))
+(def o2 (c/copy-namespaces-unmodified tns-path 'clojure.tools.namespace.dir staging-path {:dry-run? true :print? true}))
+;;(print (apply str (:dry-run-msgs o2)))
 )
 
 
@@ -131,17 +134,38 @@ is anything other than 'one.two'."
 
   WARNING: This function moves and deletes your source files!  Make
   sure you have a backup or version control."
-  [old-sym new-sym source-path dest-path]
-  ;; TBD: Add dry run option
+  [old-sym new-sym source-path dest-path opts]
   (let [old-file (io/file source-path (#'move/ns-file-name old-sym))
         new-file (io/file dest-path (#'move/ns-file-name new-sym))]
-    (.mkdirs (.getParentFile new-file))
-    (io/copy old-file new-file)
-    (.delete old-file)
-    (loop [dir (.getParentFile old-file)]
-      (when (empty? (.listFiles dir))
-        (.delete dir)
-        (recur (.getParentFile dir))))))
+    (when (:print? opts)
+      (println (format "mkdir %s"
+                       (abbreviate-path (str (.getParentFile new-file))
+                                        dest-path (:dest-path-abbrev opts)))))
+    (when-not (:dry-run? opts)
+      (.mkdirs (.getParentFile new-file)))
+    (when (:print? opts)
+      (println (format "copy %s %s"
+                       (abbreviate-path (str old-file)
+                                        source-path (:source-path-abbrev opts))
+                       (abbreviate-path (str new-file)
+                                        dest-path (:dest-path-abbrev opts)))))
+    (when-not (:dry-run? opts)
+      (io/copy old-file new-file))
+    (when (:print? opts)
+      (println (format "delete %s"
+                       (abbreviate-path (str old-file)
+                                        source-path (:source-path-abbrev opts)))))
+    (when-not (:dry-run? opts)
+      (.delete old-file))
+    (when (:print? opts)
+      (println (format "delete old dir %s if empty"
+                       (abbreviate-path (str (.getParentFile old-file))
+                                        source-path (:source-path-abbrev opts)))))
+    (when-not (:dry-run? opts)
+      (loop [dir (.getParentFile old-file)]
+        (when (empty? (.listFiles dir))
+          (.delete dir)
+          (recur (.getParentFile dir)))))))
 
 
 (defn replace-ns-symbol
@@ -211,15 +235,9 @@ is anything other than 'one.two'."
 (require '[dolly.clone :as c])
 (def tns-path "/Users/jafinger/clj/dolly/copy-deps/tools.namespace/src/main/clojure")
 (def staging-path "/Users/jafinger/clj/dolly/staging")
-(def o1 (c/update-file (str tns-path "/clojure/tools/namespace.clj")
-                       {:dry-run? true}
-                       c/replace-ns-symbol 
-                       'clojure.tools.namespace
-                       'eastwood.copieddeps.tns.clojure.tools.namespace))
 (def o1 (c/update-file (str tns-path "/clojure/tools/namespace.clj") {:dry-run? true} c/replace-ns-symbol 'clojure.tools.namespace 'eastwood.copieddeps.tns.clojure.tools.namespace))
-(pprint o1)
-(def o2 (c/copy-namespaces-unmodified tns-path 'clojure.tools.namespace.dir staging-path true))
-(print (apply str (:dry-run-msgs o2)))
+(def m1 (into (sorted-map) (:symbols o1)))
+(pprint m1)
 )
 
 
@@ -243,7 +261,7 @@ is anything other than 'one.two'."
   sure you have a backup or version control."
   [old-sym new-sym source-path dest-path dirs opts]
   ;; TBD: Add dry run option
-  (move-ns-file old-sym new-sym source-path dest-path)
+  (move-ns-file old-sym new-sym source-path dest-path opts)
   (doseq [file (#'move/clojure-source-files dirs)]
     (update-file opts file replace-ns-symbol old-sym new-sym)))
 
