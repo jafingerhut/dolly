@@ -1,0 +1,180 @@
+From 4729120caf395fa549af662e42da1f5f8e76a55d Mon Sep 17 00:00:00 2001
+From: Andy Fingerhut <andy_fingerhut@alum.wustl.edu>
+Date: Mon, 8 Sep 2014 16:28:43 -0600
+Subject: [PATCH] TNS-20: Fix bug in determining namespace unload order
+
+---
+ src/main/clojure/clojure/tools/namespace/track.clj |   4 +-
+ .../clojure/tools/namespace/dependency_test.clj    |   3 +-
+ .../tools/namespace/load_unload_order_test.clj     | 102 +++++++++++++++++++++
+ .../clojure/clojure/tools/namespace/move_test.clj  |   2 +-
+ 4 files changed, 107 insertions(+), 4 deletions(-)
+ create mode 100644 src/test/clojure/clojure/tools/namespace/load_unload_order_test.clj
+
+diff --git a/src/main/clojure/clojure/tools/namespace/track.clj b/src/main/clojure/clojure/tools/namespace/track.clj
+index d4851cf..7228cd7 100644
+--- a/src/main/clojure/clojure/tools/namespace/track.clj
++++ b/src/main/clojure/clojure/tools/namespace/track.clj
+@@ -75,7 +75,7 @@
+     (assoc tracker
+       ::deps new-deps
+       ::unload (distinct
+-               (concat (reverse (sort (dep/topo-comparator deps) changed))
++               (concat (reverse (sort (dep/topo-comparator new-deps) changed))
+                        unload))
+       ::load (distinct
+              (concat (sort (dep/topo-comparator new-deps) changed)
+@@ -97,7 +97,7 @@
+     (assoc tracker
+       ::deps new-deps
+       ::unload (distinct
+-                (concat (reverse (sort (dep/topo-comparator deps) changed))
++                (concat (reverse (sort (dep/topo-comparator new-deps) changed))
+                         unload))
+       ::load (distinct
+               (filter (complement (set removed-names))
+diff --git a/src/test/clojure/clojure/tools/namespace/dependency_test.clj b/src/test/clojure/clojure/tools/namespace/dependency_test.clj
+index 5aedb27..e275977 100644
+--- a/src/test/clojure/clojure/tools/namespace/dependency_test.clj
++++ b/src/test/clojure/clojure/tools/namespace/dependency_test.clj
+@@ -246,7 +246,7 @@
+   (is (= '#{four seven six three}
+          (transitive-dependents g2 'two))))
+ 
+-(defn- before?
++(defn before?
+   "True if x comes before y in an ordered collection."
+   [coll x y]
+   (loop [[item & more] (seq coll)]
+@@ -277,6 +277,7 @@
+          'three 'seven
+          'three 'eight
+          'three 'nine
++         'five  'seven
+          'five  'eight
+          'five  'nine
+          'seven 'eight
+diff --git a/src/test/clojure/clojure/tools/namespace/load_unload_order_test.clj b/src/test/clojure/clojure/tools/namespace/load_unload_order_test.clj
+new file mode 100644
+index 0000000..4894e4e
+--- /dev/null
++++ b/src/test/clojure/clojure/tools/namespace/load_unload_order_test.clj
+@@ -0,0 +1,102 @@
++(ns clojure.tools.namespace.load-unload-order-test
++  (:use [clojure.java.io :as io]
++        [clojure.test :only (deftest is are)])
++  (:require [clojure.tools.namespace.dir :as dir]
++            [clojure.tools.namespace.track :as track]
++            [clojure.tools.namespace.dependency-test :as deptest]
++            [clojure.tools.namespace.move-test :as movetest])
++  (:import (java.io File)))
++
++;; dependency graph of namespaces, leaving out the prefix
++;; "com.example." for brevity:
++;;
++;;     one
++;;    / |
++;;   /  |
++;;  |  two
++;;  |  / \
++;; three  four
++;;  |
++;; five
++
++(def ^:private file-one-contents "
++ (ns com.example.one
++   (:require [com.example.two :as two]
++             [com.example.three :as three]))
++
++ (defn foo []
++   (com.example.four/foo))
++")
++
++(def ^:private file-two-contents "
++ (ns com.example.two
++   (:require [com.example.three :as three]
++             [com.example.four :as four]))
++")
++
++(def ^:private file-three-contents "
++ (ns com.example.three
++   (:use com.example.five))
++")
++
++(def ^:private file-four-contents "
++ (ns com.example.four)
++ (defn foo [] \"foo\")
++")
++
++(def ^:private file-five-contents "
++ (ns com.example.five)
++ (defn bar [] \"bar\")
++")
++
++(deftest t-load-unload-order
++  (let [temp-dir (movetest/create-temp-dir "tools-namespace-t-load-unload-order-ns")
++        src-dir (io/file temp-dir "src")
++        example-dir (io/file temp-dir "src" "com" "example")
++        file-one (io/file example-dir "one.clj")
++        file-two (io/file example-dir "two.clj")
++        file-three (io/file example-dir "three.clj")
++        file-four (io/file example-dir "a" "four.clj")
++        file-five (io/file example-dir "five.clj")]
++
++    (.mkdirs (io/file example-dir "a"))
++    (spit file-one file-one-contents)
++    (spit file-two file-two-contents)
++    (spit file-three file-three-contents)
++    (spit file-four file-four-contents)
++    (spit file-five file-five-contents)
++    (Thread/sleep 1500) ;; ensure file timestamps are different
++
++    (let [tracker (dir/scan-all (track/tracker) temp-dir)
++          load-order (:clojure.tools.namespace.track/load tracker)
++          unload-order (:clojure.tools.namespace.track/unload tracker)
++          dependencies (:dependencies (:clojure.tools.namespace.track/deps tracker))
++          dependents (:dependents (:clojure.tools.namespace.track/deps tracker))]
++      (is (= dependencies
++             {'com.example.one   '#{com.example.two com.example.three}
++              'com.example.two   '#{com.example.three com.example.four}
++              'com.example.three '#{com.example.five}}))
++      (is (= dependents
++             {'com.example.two    '#{com.example.one}
++              'com.example.three  '#{com.example.one com.example.two}
++              'com.example.four   '#{com.example.two}
++              'com.example.five   '#{com.example.three}}))
++      (are [x y] (deptest/before? load-order x y)
++           'com.example.five   'com.example.three
++           'com.example.five   'com.example.two
++           'com.example.five   'com.example.one
++           'com.example.four   'com.example.two
++           'com.example.four   'com.example.one
++           'com.example.three  'com.example.two
++           'com.example.three  'com.example.one
++           'com.example.two    'com.example.one)
++
++      (are [x y] (deptest/before? unload-order x y)
++           'com.example.three 'com.example.five
++           'com.example.two   'com.example.five
++           'com.example.one   'com.example.five
++           'com.example.two   'com.example.four
++           'com.example.one   'com.example.four
++           'com.example.two   'com.example.three
++           'com.example.one   'com.example.three
++           'com.example.one   'com.example.two))))
+diff --git a/src/test/clojure/clojure/tools/namespace/move_test.clj b/src/test/clojure/clojure/tools/namespace/move_test.clj
+index 2ba250a..8041458 100644
+--- a/src/test/clojure/clojure/tools/namespace/move_test.clj
++++ b/src/test/clojure/clojure/tools/namespace/move_test.clj
+@@ -4,7 +4,7 @@
+         [clojure.tools.namespace.move :only (move-ns)])
+   (:import (java.io File)))
+ 
+-(defn- create-temp-dir
++(defn create-temp-dir
+   "Creates and returns a new temporary directory java.io.File."
+   [name]
+   (let [temp-file (File/createTempFile name nil)]
+-- 
+2.1.0
+
