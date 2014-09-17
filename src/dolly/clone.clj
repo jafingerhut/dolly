@@ -1,7 +1,7 @@
 (ns dolly.clone
   (:require [clojure.string :as str]
             [clojure.java.io :as io]
-            [clojure.tools.namespace.move :as move]
+            [dolly.copieddeps.tns.clojure.tools.namespace.move :as move]
             [dolly.namespace :as ns])
   (:import (java.io File)))
 
@@ -90,7 +90,7 @@ is anything other than 'one.two'."
   (let [ns-info (ns/namespaces-in-dirs {:paths [source-path]})]
     (if (:err ns-info)
       ns-info
-      (let [all-nss (map second (:clojure.tools.namespace.file/filemap ns-info))
+      (let [all-nss (map second (:dolly.copieddeps.tns.clojure.tools.namespace.file/filemap ns-info))
             to-copy? #(namespace-extends? % ns-sym)
             do-copy (filter to-copy? all-nss)
             dont-copy (remove to-copy? all-nss)]
@@ -111,9 +111,9 @@ is anything other than 'one.two'."
 (require '[dolly.clone :as c])
 (def tns-path "/Users/jafinger/clj/dolly/copy-deps/tools.namespace/src/main/clojure")
 (def staging-path "/Users/jafinger/clj/dolly/staging")
-(def o1 (c/copy-namespaces-unmodified tns-path staging-path 'clojure.tools.namespace {:dry-run? true :print? true}))
+(def o1 (c/copy-namespaces-unmodified tns-path staging-path 'dolly.copieddeps.tns.clojure.tools.namespace {:dry-run? true :print? true}))
 ;;(print (apply str (:dry-run-msgs o1)))
-(def o2 (c/copy-namespaces-unmodified tns-path staging-path 'clojure.tools.namespace.dir {:dry-run? true :print? true}))
+(def o2 (c/copy-namespaces-unmodified tns-path staging-path 'dolly.copieddeps.tns.clojure.tools.namespace.dir {:dry-run? true :print? true}))
 ;;(print (apply str (:dry-run-msgs o2)))
 )
 
@@ -309,7 +309,7 @@ you have a backup or version control."
   (let [ns-info (ns/namespaces-in-dirs {:paths [source-path]})]
     (if (:err ns-info)
       ns-info
-      (let [all-nss (map second (:clojure.tools.namespace.file/filemap ns-info))
+      (let [all-nss (map second (:dolly.copieddeps.tns.clojure.tools.namespace.file/filemap ns-info))
             to-move? #(namespace-extends? % source-ns-sym)
             do-move (filter to-move? all-nss)
             dont-move (remove to-move? all-nss)
@@ -336,14 +336,14 @@ you have a backup or version control."
 (def tns-path "/Users/jafinger/clj/dolly/copy-deps/tools.namespace/src/main/clojure")
 (def staging-path "/Users/jafinger/clj/dolly/staging")
 (def dolly-src-path ["/Users/jafinger/clj/dolly/src" tns-path])
-(def o1 (c/update-file (str tns-path "/clojure/tools/namespace.clj") {:dry-run? true} c/replace-ns-symbols '{clojure.tools.namespace eastwood.copieddeps.tns.clojure.tools.namespace}))
+(def o1 (c/update-file (str tns-path "/clojure/tools/namespace.clj") {:dry-run? true} c/replace-ns-symbols '{dolly.copieddeps.tns.clojure.tools.namespace eastwood.copieddeps.tns.clojure.tools.namespace}))
 (def m1 (into (sorted-map) (:symbols o1)))
 (pprint m1)
 
-(def sym-map '{clojure.tools.namespace eastwood.copieddeps.tns.clojure.tools.namespace, clojure.tools.namespace.dependency eastwood.copieddeps.tns.clojure.tools.namespace.dependency, clojure.tools.namespace.dir eastwood.copieddeps.tns.clojure.tools.namespace.dir, clojure.tools.namespace.file eastwood.copieddeps.tns.clojure.tools.namespace.file, clojure.tools.namespace.find eastwood.copieddeps.tns.clojure.tools.namespace.find, clojure.tools.namespace.move eastwood.copieddeps.tns.clojure.tools.namespace.move, clojure.tools.namespace.parse eastwood.copieddeps.tns.clojure.tools.namespace.parse, clojure.tools.namespace.reload eastwood.copieddeps.tns.clojure.tools.namespace.reload, clojure.tools.namespace.repl eastwood.copieddeps.tns.clojure.tools.namespace.repl, clojure.tools.namespace.track eastwood.copieddeps.tns.clojure.tools.namespace.track})
+(def sym-map '{dolly.copieddeps.tns.clojure.tools.namespace eastwood.copieddeps.tns.clojure.tools.namespace, dolly.copieddeps.tns.clojure.tools.namespace.dependency eastwood.copieddeps.tns.clojure.tools.namespace.dependency, dolly.copieddeps.tns.clojure.tools.namespace.dir eastwood.copieddeps.tns.clojure.tools.namespace.dir, dolly.copieddeps.tns.clojure.tools.namespace.file eastwood.copieddeps.tns.clojure.tools.namespace.file, dolly.copieddeps.tns.clojure.tools.namespace.find eastwood.copieddeps.tns.clojure.tools.namespace.find, dolly.copieddeps.tns.clojure.tools.namespace.move eastwood.copieddeps.tns.clojure.tools.namespace.move, dolly.copieddeps.tns.clojure.tools.namespace.parse eastwood.copieddeps.tns.clojure.tools.namespace.parse, dolly.copieddeps.tns.clojure.tools.namespace.reload eastwood.copieddeps.tns.clojure.tools.namespace.reload, dolly.copieddeps.tns.clojure.tools.namespace.repl eastwood.copieddeps.tns.clojure.tools.namespace.repl, dolly.copieddeps.tns.clojure.tools.namespace.track eastwood.copieddeps.tns.clojure.tools.namespace.track})
 (c/move-namespaces tns-path staging-path sym-map dolly-src-path {:dry-run? true :print? true})
 
-(c/move-namespaces-and-rename tns-path staging-path 'clojure.tools.namespace 'eastwood.copieddeps.tns.clojure.tools.namespace dolly-src-path {:dry-run? true :print? true})
+(c/move-namespaces-and-rename tns-path staging-path 'dolly.copieddeps.tns.clojure.tools.namespace 'eastwood.copieddeps.tns.clojure.tools.namespace dolly-src-path {:dry-run? true :print? true})
 
-(c/move-namespaces-and-rename tns-path staging-path 'clojure.tools.namespace.track 'eastwood.copieddeps.tns.clojure.tools.namespace.track dolly-src-path {:dry-run? true :print? true})
+(c/move-namespaces-and-rename tns-path staging-path 'dolly.copieddeps.tns.clojure.tools.namespace.track 'eastwood.copieddeps.tns.clojure.tools.namespace.track dolly-src-path {:dry-run? true :print? true})
 )
