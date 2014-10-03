@@ -32,9 +32,7 @@ cause that to happen, use:
 
 Then deploy a release to Clojars.org:
 
-* TBD: Add instructions for that here, including the potentially
-  longer 'what was needed to do it the first time', perhaps later
-  below.
+    % lein deploy clojars
 
 
 When that is complete, then pick the next version number, at least a
