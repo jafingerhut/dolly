@@ -1,4 +1,4 @@
-(defproject jafingerhut/dolly "0.1.0"
+(defproject jafingerhut/dolly "0.2.0-SNAPSHOT"
   :description "Clojure namespace cloning"
   :url "http://github.com/jafingerhut/dolly"
   :license {:name "Eclipse Public License"
