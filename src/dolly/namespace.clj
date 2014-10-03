@@ -190,7 +190,7 @@ user=> (ns-to-clj-filename 'com.example.my-ns)
   ""
   [ns-info]
   (let [show-opts (:namespace-show-opts ns-info)
-        nss-unload-order (:dolly.copieddeps.tns.clojure.tools.namespace.track/unload ns-info)
+        nss-reverse-load-order (reverse (:dolly.copieddeps.tns.clojure.tools.namespace.track/load ns-info))
         dependencies (:dependencies (:dolly.copieddeps.tns.clojure.tools.namespace.track/deps
                                      ns-info))
         ns-number (atom 1)
@@ -218,7 +218,7 @@ user=> (ns-to-clj-filename 'com.example.my-ns)
                      (doseq [child-ns (sort (dependencies ns))]
                        (show child-ns (inc level) ns))
                      (swap! shown-namespaces assoc ns next-ns-number)))))]
-    (doseq [ns nss-unload-order]
+    (doseq [ns nss-reverse-load-order]
       (when-not (@shown-namespaces ns)
         (show ns 0 nil)))))
 
@@ -230,7 +230,7 @@ user=> (ns-to-clj-filename 'com.example.my-ns)
 
 The following two are from a tools.namespace 'tracker' map:
 
-  :dolly.copieddeps.tns.clojure.tools.namespace.track/unload
+  :dolly.copieddeps.tns.clojure.tools.namespace.track/load
   :dolly.copieddeps.tns.clojure.tools.namespace.track/deps
 
 Returns a sequence of arguments to be passed to any of the graph->*
@@ -238,9 +238,9 @@ functions from the rhizome library, e.g. graph->dot, graph->svg,
 graph->image."
   [ns-info]
   (let [show-opts (:namespace-show-opts ns-info)
-        nss-unload-order (:dolly.copieddeps.tns.clojure.tools.namespace.track/unload ns-info)
-;;        _ (println "jafinger-dbg: ns-info->graph-args nss-unload-order=" (seq nss-unload-order))
-        nss-set (set nss-unload-order)
+        nss-reverse-load-order (reverse (:dolly.copieddeps.tns.clojure.tools.namespace.track/load ns-info))
+;;        _ (println "jafinger-dbg: ns-info->graph-args nss-reverse-load-order=" (seq nss-reverse-load-order))
+        nss-set (set nss-reverse-load-order)
         deps (:dolly.copieddeps.tns.clojure.tools.namespace.track/deps ns-info)
         dependencies (:dependencies deps)
         nodes (set/union
@@ -312,14 +312,14 @@ a requires or uses b."
 
 
 (defn wrong-tracker-load-unload-order
-  "Returns nil if the tracker has load and unload orders that are
+  "Returns nil if the tracker has load and/or unload orders that are
 consistent with its :dependencies and :dependents graphs.  If there
 are inconsistencies, returns a map containing either or both of the
 keys :load or :unload, where the values are a collection of 2-element
 vectors [a b] where a and b are symbols representing namespace names,
 and a requires or uses b, and that dependency order is violated by the
 load or unload order in the tracker."
-  [tracker]
+  [tracker check-unload?]
   (let [load-order (:dolly.copieddeps.tns.clojure.tools.namespace.track/load tracker)
         load-set (set load-order)
         unload-order (:dolly.copieddeps.tns.clojure.tools.namespace.track/unload tracker)
@@ -332,12 +332,14 @@ load or unload order in the tracker."
                                   (and (load-set a) (load-set b)
                                        (before? load-order a b)))
                                 (concat dependency-pairs dependent-pairs)))
-        unload-order-violations (set
-                                 (filter
-                                  (fn [[a b]]
-                                    (and (unload-set a) (unload-set b)
-                                         (before? unload-order b a)))
-                                  (concat dependency-pairs dependent-pairs)))]
+        unload-order-violations (if check-unload?
+                                  (set
+                                   (filter
+                                    (fn [[a b]]
+                                      (and (unload-set a) (unload-set b)
+                                           (before? unload-order b a)))
+                                    (concat dependency-pairs dependent-pairs)))
+                                  nil)]
     (if (or (seq load-order-violations)
             (seq unload-order-violations))
       {:load (seq load-order-violations)
@@ -381,7 +383,13 @@ uses tools.namespace.  Please report this as an issue for Dolly at:
               f2 (:dolly.copieddeps.tns.clojure.tools.namespace.dir/files tracker)]
           (merge
            opts
-           (if-let [bad-order (wrong-tracker-load-unload-order tracker)]
+           ;; Do not bother checking the unload order.  At least as of
+           ;; tools.namespace version 0.2.7, the unload order is not
+           ;; guaranteed to be anything in particular after doing
+           ;; dir/scan-all on a collection of directories.  See
+           ;; http://dev.clojure.org/jira/browse/TNS-20 and discussion
+           ;; in comments.
+           (if-let [bad-order (wrong-tracker-load-unload-order tracker false)]
              (bad-load-unload-order-map bad-order tracker)
              {:err nil})
            (if (= f1 f2)
