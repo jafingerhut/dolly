@@ -8,6 +8,10 @@ Secondary goals: Provide utilities to Clojure developers for
 investigating dependencies between namespaces within your Leiningen
 project, and between Java classes and interfaces.
 
+TBD: More documentation has been written for features than code has
+been written to implement them.  For now, don't believe this README,
+believe the code.
+
 
 ## Motivation
 
@@ -79,9 +83,9 @@ move to newer versions of that library.
 
 ## Installation and Quick Usage
 
-Put `[jafingerhut/dolly "0.1.0-SNAPSHOT"]` into the `:plugins` vector
+Put `[jafingerhut/dolly "0.1.0"]` into the `:plugins` vector
 of your `:user` profile, or if you are on Leiningen 1.x do `lein
-plugin install dolly 0.1.0-SNAPSHOT`.
+plugin install dolly 0.1.0`.
 
 FIXME: and add an example usage that actually makes sense:
 

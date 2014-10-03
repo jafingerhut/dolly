@@ -7,7 +7,7 @@
             [dolly.namespace :as ns]))
 
 
-(def dolly-version-string "0.1.0-SNAPSHOT")
+(def dolly-version-string "0.1.0")
 (def dolly-url "https://github.com/jafingerhut/dolly")
 
 
