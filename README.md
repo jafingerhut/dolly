@@ -8,9 +8,33 @@ Secondary goals: Provide utilities to Clojure developers for
 investigating dependencies between namespaces within your Leiningen
 project, and between Java classes and interfaces.
 
-TBD: More documentation has been written for features than code has
-been written to implement them.  For now, don't believe this README,
-believe the code.
+
+## Status
+
+dolly version 0.1.0 is on
+[Clojars](https://clojars.org/jafingerhut/dolly).  It can do some
+things, but certainly not all that I wish it could do.
+
+As an alternative, you may wish to take a look at the
+[`mranderson`](https://github.com/benedekfazekas/mranderson) to see if
+it meets your needs.  I haven't used it myself, so can't give a good
+comparison between it and dolly, other than to say they have similar
+goals.
+
+If you want to see how I use it to copy-in-and-rename dependencies for
+Eastwood, look
+[here](https://github.com/jonase/eastwood/blob/master/copy-deps-scripts/README.md#using-dolly-to-copy-dependencies-into-eastwood-source-code).
+
+Note that dolly 0.1.0 has a bug in which some `:require` and `:use`
+subforms inside `ns` forms will not have their namespaces renamed as
+you might wish, because the namespace is 'split' into multiple parts
+that dolly's simple-minded string matching technique misses.
+Currently when I use dolly from Eastwood, I correct those by hand
+after using dolly.
+
+For now, don't believe the part of this README below except as a wish
+list.  More documentation has been written for features I wish for,
+than code has been written to implement them.
 
 
 ## Motivation
